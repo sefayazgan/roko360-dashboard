@@ -101,6 +101,13 @@ function bindEysSecure(){
    const data=await response.json();
    if(!response.ok) throw new Error(data.error||'Giriş başarısız');
    eysSessionToken=data.token;
+   try {
+    await loadRemoteState();
+   } catch(syncErr) {
+    remoteStateReady=false;
+    stateSyncStatus='Veritabanı bağlantı hatası: '+syncErr.message;
+   }
+   render();
    await fetchEysReport();
   }catch(err){if(msg)msg.textContent='Giriş hatası: '+err.message;}
   finally{const b=document.getElementById('eysLogin');if(b)b.disabled=false;}
