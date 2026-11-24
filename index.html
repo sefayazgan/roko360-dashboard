@@ -30,7 +30,8 @@ const read=(k)=>{try{return JSON.parse(localStorage.getItem('roko360_'+k)||'[]')
 const write=(k,v)=>{localStorage.setItem('roko360_'+k,JSON.stringify(v));if(eysSessionToken&&remoteStateReady)saveRemoteState().catch(()=>{remoteStateReady=false;});};
 let current='overview',editingTask=null;
 const EYS_API_BASE='https://roko360-api.rvr9nm7bkk.workers.dev';
-let eysSessionToken=null, eysRemoteSnapshot=null, remoteStateReady=false;\nlet stateSyncStatus='Veritabanı henüz doğrulanmadı';
+let eysSessionToken=null, eysRemoteSnapshot=null, remoteStateReady=false;
+let stateSyncStatus='Veritabanı henüz doğrulanmadı';
 
 const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(Number(n)||0);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
