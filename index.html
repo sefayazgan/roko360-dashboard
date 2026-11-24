@@ -31,7 +31,8 @@ const write=(k,v)=>{localStorage.setItem('roko360_'+k,JSON.stringify(v));if(eysS
 let current='overview',editingTask=null;
 const EYS_API_BASE='https://roko360-api.rvr9nm7bkk.workers.dev';
 let eysSessionToken=localStorage.getItem('roko360_session_token')||null, eysRemoteSnapshot=null, remoteStateReady=false;
-let stateSyncStatus='Veritabanı henüz doğrulanmadı';\nlet newsItems=[],newsUpdatedAt=null,newsLoading=false,newsError='';
+let stateSyncStatus='Veritabanı henüz doğrulanmadı';
+let newsItems=[],newsUpdatedAt=null,newsLoading=false,newsError='';
 
 const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(Number(n)||0);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -66,7 +67,8 @@ function moduleView(id){let extra='';if(id==='eys'){const d=getEysSnapshot(),o=d
 else if(id==='rnd')return recordsView(id);
 else if(id==='investments')return recordsView(id);
 else if(id==='automations')return recordsView(id);
-else if(id==='research')return recordsView(id);\nelse if(id==='news')return newsView();
+else if(id==='research')return recordsView(id);
+else if(id==='news')return newsView();
 else if(id==='reports'){const t=read('tasks'),f=read('finance'),r=read('rnd'),q=read('research'),inv=read('investments'),d=getEysSnapshot(),o=d?.orders||{},income=f.filter(x=>x.kind==='Gelir').reduce((a,x)=>a+Number(x.amount),0),expense=f.filter(x=>x.kind==='Gider').reduce((a,x)=>a+Number(x.amount),0);extra='<div class="metrics"><div class="metric"><div class="metric-top">EYS günlük satış</div><strong>'+(o.active_sales_today==null?'—':money(o.active_sales_today))+'</strong><small>'+(d?esc(d.generated_at||'Rapor tarihi yok'):'EYS raporu bağlı değil')+'</small></div><div class="metric"><div class="metric-top">Finans neti</div><strong>'+money(income-expense)+'</strong><small>Manuel girilen kayıtlar</small></div><div class="metric"><div class="metric-top">Açık görev</div><strong>'+t.filter(x=>!x.done).length+'</strong></div><div class="metric"><div class="metric-top">Yatırım kaydı</div><strong>'+inv.length+'</strong></div></div><div class="panel" style="margin-top:14px"><h3>Yönetim özeti</h3><p class="muted">Görev: '+t.length+' · Ürün fikri: '+r.length+' · Araştırma: '+q.length+' · Finans hareketi: '+f.length+'</p><p class="muted">Bu rapor EYS modülüne yüklenen son raporu ve bu tarayıcıdaki manuel kayıtları kullanır. Banka, yatırım hesabı veya Trendyol canlı API bağlantısı değildir.</p><button class="btn secondary" onclick="window.print()">Raporu yazdır / PDF kaydet</button></div>';}
 return (id==='eys'?'': '<div class="notice">Bu modülün arayüzü aşamalı olarak geliştiriliyor. Henüz harici sistemlere bağlı değil.</div>')+shell(modules.find(m=>m[0]===id)[2],descriptions[id]||'',extra)}
 function render(){nav();const m=modules.find(x=>x[0]===current)||modules[0];document.getElementById('pageTitle').textContent=m[3];document.getElementById('crumb').textContent=m[2].toLocaleUpperCase('tr-TR');document.getElementById('view').innerHTML=current==='overview'?overview():current==='life'?tasksView():current==='finance'?financeView():moduleView(current);
@@ -75,7 +77,8 @@ if(current==='eys'){
  document.getElementById('view').insertAdjacentHTML('afterbegin',authPanel);
 }
 bind();
-if(current==='eys') bindEysSecure();\nif(current==='news'){const nb=document.getElementById('newsRefresh');if(nb)nb.addEventListener('click',loadNews);if(!newsUpdatedAt)loadNews();}
+if(current==='eys') bindEysSecure();
+if(current==='news'){const nb=document.getElementById('newsRefresh');if(nb)nb.addEventListener('click',loadNews);if(!newsUpdatedAt)loadNews();}
 }
 
 async function fetchEysReport(){
@@ -131,5 +134,6 @@ document.querySelectorAll('[data-done]').forEach(x=>x.addEventListener('change',
 document.querySelectorAll('[data-delete-task]').forEach(x=>x.addEventListener('click',()=>{if(confirm('Bu görevi silmek istiyor musun?')){write('tasks',read('tasks').filter(t=>t.id!==x.dataset.deleteTask));render()}}));
 document.querySelectorAll('[data-delete-finance]').forEach(x=>x.addEventListener('click',()=>{if(confirm('Bu finans kaydını silmek istiyor musun?')){write('finance',read('finance').filter(t=>t.id!==x.dataset.deleteFinance));render()}}));
 }
-setInterval(()=>{if(current==='news')loadNews();},300000);\ndocument.getElementById('today').textContent=new Intl.DateTimeFormat('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Istanbul'}).format(new Date());render();
+setInterval(()=>{if(current==='news')loadNews();},300000);
+document.getElementById('today').textContent=new Intl.DateTimeFormat('tr-TR',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/Istanbul'}).format(new Date());render();
 </script></body></html>
