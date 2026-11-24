@@ -111,6 +111,29 @@ async function handle(request, env) {
       .bind("owner", JSON.stringify(data)).run();
     return json({ saved: true }, 200, origin);
   }
+  if (url.pathname === "/api/news" && request.method === "GET") {
+    try {
+      const response = await fetch("https://www.mynet.com/rss/haber/sondakika.rss", {
+        headers: { "User-Agent": "ROKO-360 News Reader", "Accept": "application/rss+xml, application/xml, text/xml" },
+        cf: { cacheTtl: 240, cacheEverything: true }
+      });
+      if (!response.ok) return json({ error: "Mynet RSS yanıt vermedi (" + response.status + ")" }, 502, origin);
+      const xml = await response.text();
+      const blocks = [...xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)].slice(0, 30);
+      const decode = (value) => value.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      const tag = (block, name) => {
+        const match = block.match(new RegExp("<" + name + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + name + ">", "i"));
+        return match ? decode(match[1]) : "";
+      };
+      const items = blocks.map(match => {
+        const block = match[1];
+        return { title: tag(block, "title"), link: tag(block, "link"), pubDate: tag(block, "pubDate") };
+      }).filter(item => item.title && /^https?:\\/\\//i.test(item.link));
+      return json({ source: "Mynet", fetched_at: new Date().toISOString(), items }, 200, origin);
+    } catch (error) {
+      return json({ error: "Mynet haber akışı okunamadı" }, 502, origin);
+    }
+  }
   return json({ error: "Not found" }, 404, origin);
 }
 export default { fetch: handle };
