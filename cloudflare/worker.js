@@ -36,7 +36,7 @@ async function hmacKey(secret) {
 async function issueToken(secret) {
   const payload = b64url(new TextEncoder().encode(JSON.stringify({
     sub: "roko360-owner",
-    exp: Math.floor(Date.now() / 1000) + 8 * 60 * 60
+    exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
   })));
   const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), new TextEncoder().encode(payload));
   return payload + "." + b64url(new Uint8Array(signature));
