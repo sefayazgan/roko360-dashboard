@@ -30,7 +30,7 @@ const read=(k)=>{try{return JSON.parse(localStorage.getItem('roko360_'+k)||'[]')
 const write=(k,v)=>{localStorage.setItem('roko360_'+k,JSON.stringify(v));if(eysSessionToken&&remoteStateReady)saveRemoteState().catch(()=>{remoteStateReady=false;});};
 let current='overview',editingTask=null;
 const EYS_API_BASE='https://roko360-api.rvr9nm7bkk.workers.dev';
-let eysSessionToken=sessionStorage.getItem('roko360_session_token')||null, eysRemoteSnapshot=null, remoteStateReady=false;
+let eysSessionToken=localStorage.getItem('roko360_session_token')||null, eysRemoteSnapshot=null, remoteStateReady=false;
 let stateSyncStatus='Veritabanı henüz doğrulanmadı';
 
 const money=n=>new Intl.NumberFormat('tr-TR',{style:'currency',currency:'TRY',maximumFractionDigits:2}).format(Number(n)||0);
@@ -88,7 +88,7 @@ async function fetchEysReport(){
   render();
  }catch(err){
   if(msg) msg.textContent='Bağlantı hatası: '+err.message;
-  if(err.message==='Unauthorized'){eysSessionToken=null;sessionStorage.removeItem('roko360_session_token');remoteStateReady=false;render();}
+  if(err.message==='Unauthorized'){eysSessionToken=null;localStorage.removeItem('roko360_session_token');remoteStateReady=false;render();}
  }
 }
 function bindEysSecure(){
@@ -102,7 +102,7 @@ function bindEysSecure(){
    const response=await fetch(EYS_API_BASE+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
    const data=await response.json();
    if(!response.ok) throw new Error(data.error||'Giriş başarısız');
-   eysSessionToken=data.token; sessionStorage.setItem('roko360_session_token',eysSessionToken);
+   eysSessionToken=data.token; localStorage.setItem('roko360_session_token',eysSessionToken);
    try {
     await loadRemoteState();
    } catch(syncErr) {
