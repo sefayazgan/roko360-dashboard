@@ -70,6 +70,50 @@ async function getEysReport(env) {
   if (report.schema_version !== 1 || !report.orders || !report.products) throw new Error("Invalid EYS report schema");
   return report;
 }
+async function getHaremPrices() {
+  const endpoint = "https://hrmsocketonly.haremaltin.com/socket.io/?EIO=4&transport=websocket";
+  const response = await fetch(endpoint, {
+    headers: { "Upgrade": "websocket", "Origin": "https://canlipiyasalar.haremaltin.com", "Referer": "https://canlipiyasalar.haremaltin.com/" }
+  });
+  const ws = response.webSocket;
+  if (!ws) throw new Error("Harem WebSocket bağlantısı kabul edilmedi");
+  ws.accept();
+  return await new Promise((resolve, reject) => {
+    let settled = false, pingTimer = null;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true; clearTimeout(timeout); if (pingTimer) clearInterval(pingTimer);
+      try { ws.close(1000, "snapshot received"); } catch {}
+      if (error) reject(error); else resolve(value);
+    };
+    const timeout = setTimeout(() => finish(new Error("Harem fiyat akışı zaman aşımına uğradı")), 9000);
+    ws.addEventListener("message", event => {
+      const raw = typeof event.data === "string" ? event.data : "";
+      if (raw.startsWith("0")) {
+        try {
+          const hello = JSON.parse(raw.slice(1));
+          pingTimer = setInterval(() => { try { if (ws.readyState === WebSocket.OPEN) ws.send("3"); } catch {} }, Math.max(10000, Number(hello.pingInterval) || 25000));
+          ws.send("40");
+        } catch (error) { finish(error); }
+        return;
+      }
+      if (raw === "2") { try { ws.send("3"); } catch {} return; }
+      if (!raw.startsWith("42")) return;
+      try {
+        const packet = JSON.parse(raw.slice(2));
+        if (!Array.isArray(packet) || packet[0] !== "price_changed") return;
+        const data = packet[1]?.data || {};
+        const select = code => { const item = data[code]; return item ? { buy: item.alis ?? null, sell: item.satis ?? null } : null; };
+        const prices = { gram_gold: select("ALTIN"), silver: select("GUMUSTRY"), eur: select("EURTRY"), usd: select("USDTRY") };
+        if (Object.values(prices).every(value => value === null)) return;
+        if (Object.values(prices).some(value => value === null)) { finish(new Error("Harem akışında dört sembolün tamamı bulunamadı")); return; }
+        finish(null, { source: "Harem Altın canlı Socket.IO akışı", fetched_at: new Date().toISOString(), prices });
+      } catch (error) { finish(error); }
+    });
+    ws.addEventListener("error", () => finish(new Error("Harem WebSocket bağlantı hatası")));
+    ws.addEventListener("close", () => { if (!settled) finish(new Error("Harem fiyat akışı erken kapandı")); });
+  });
+}
 async function handle(request, env) {
   const origin = request.headers.get("Origin") || "";
   if (origin && origin !== ALLOWED_ORIGIN) return json({ error: "Origin not allowed" }, 403, origin);
@@ -84,6 +128,10 @@ async function handle(request, env) {
     } catch { return json({ error: "Invalid request" }, 400, origin); }
   }
   if (!await validToken(request, env.SESSION_SECRET)) return json({ error: "Unauthorized" }, 401, origin);
+  if (url.pathname === "/api/markets" && request.method === "GET") {
+    try { return json(await getHaremPrices(), 200, origin); }
+    catch (error) { return json({ error: "Harem canlı fiyatları alınamadı: " + error.message }, 502, origin); }
+  }
   if (url.pathname === "/api/eys" && request.method === "GET") {
     try { return json(await getEysReport(env), 200, origin); }
     catch { return json({ error: "EYS report could not be loaded" }, 502, origin); }
@@ -119,8 +167,8 @@ async function handle(request, env) {
       });
       if (!response.ok) return json({ error: "Mynet RSS yanıt vermedi (" + response.status + ")" }, 502, origin);
       const xml = await response.text();
-      const blocks = [...xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)].slice(0, 30);
-      const decode = (value) => value.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      const blocks = [...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].slice(0, 30);
+      const decode = (value) => value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
       const tag = (block, name) => {
         const match = block.match(new RegExp("<" + name + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + name + ">", "i"));
         return match ? decode(match[1]) : "";
@@ -128,7 +176,7 @@ async function handle(request, env) {
       const items = blocks.map(match => {
         const block = match[1];
         return { title: tag(block, "title"), link: tag(block, "link"), pubDate: tag(block, "pubDate") };
-      }).filter(item => item.title && /^https?:\\/\\//i.test(item.link));
+      }).filter(item => item.title && /^https?:\/\//i.test(item.link));
       return json({ source: "Mynet", fetched_at: new Date().toISOString(), items }, 200, origin);
     } catch (error) {
       return json({ error: "Mynet haber akışı okunamadı" }, 502, origin);
